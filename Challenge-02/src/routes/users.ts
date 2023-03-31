@@ -1,8 +1,9 @@
 import { randomUUID } from 'crypto'
 import { FastifyInstance } from 'fastify'
-
 import { z } from 'zod'
+
 import { knex } from '../database'
+import { checkUserExists } from '../middlewares/check-user-exists'
 
 export async function UsersRoutes(app: FastifyInstance) {
   app.post('/', async (req, res) => {
@@ -23,5 +24,28 @@ export async function UsersRoutes(app: FastifyInstance) {
       })
     }
     return res.status(201).send({ id: createdUserId })
+  })
+
+  app.get('/:id/metrics', { preHandler: [checkUserExists] },async (req, res) => {
+    const getUserMetricsParamsSchema = z.object({
+      id: z.string().uuid()
+    })
+    const { id } = getUserMetricsParamsSchema.parse(req.params)
+    const totalRegisteredMeals = await knex('meals').where({
+      'user_id': id
+    }).count()
+    const totalRegisteredMealsOnDiet = await knex('meals').where({
+      'user_id': id,
+      'on_diet': true
+    }).count()
+    const totalRegisteredMealsOutDiet = await knex('meals').where({
+      'user_id': id,
+      'on_diet': false
+    }).count()
+    return res.status(200).send({
+      totalRegisteredMeals,
+      totalRegisteredMealsOnDiet,
+      totalRegisteredMealsOutDiet
+    })
   })
 }
