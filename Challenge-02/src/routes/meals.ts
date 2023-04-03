@@ -6,35 +6,27 @@ import { knex } from '../database'
 import { checkUserExists } from '../middlewares/check-user-exists'
 
 export async function MealsRoutes(app: FastifyInstance) {
-  app.post('/', async (req, res) => {
+  app.post('/', { preHandler: [checkUserExists] }, async (req, res) => {
     const createMealSchema = z.object({
       name: z.string(),
       description: z.string(),
       moment: z.coerce.date(),
       on_diet: z.boolean(),
-      user_id: z.string().uuid().nullable()
     })
-    let { userId } = req.cookies
-    if (!userId) {
-      userId = randomUUID()
-      res.cookie('userId', userId, {
-        path: '/',
-        maxAge: 1000 * 60 * 60 * 24, // 24 hours
-      })
-    }
-    const { name, description, moment, on_diet, user_id } = createMealSchema.parse(req.body)
+    const { userId } = req.cookies
+    const { name, description, moment, on_diet } = createMealSchema.parse(req.body)
     const result = await knex('meals').insert({
       id: randomUUID(),
       name,
       description,
       moment: moment.toISOString(),
       on_diet,
-      user_id: user_id ?? userId
+      user_id: userId
     }).returning('*')
     return res.status(201).send({ result })
   })
 
-  app.put('/:id', { preHandler: [checkUserExists] },async (req, res) => {
+  app.put('/:id', { preHandler: [checkUserExists] }, async (req, res) => {
     let { userId } = req.cookies
     const getMealsUpdateParamsSchema = z.object({
       id: z.string().uuid()
